@@ -16,11 +16,11 @@ require(affy)
 require(lima)
 require(hgu95a.db)
 require(annotate)
-
+require(Biobase)
 cel_file <- ReadAffy(celfile.path = "./GSE65480_RAW", compress = TRUE)
 
 cel_file
-
+colnames(cel_file)
 class(cel_file)
 dim(cel_file)
 
@@ -35,33 +35,32 @@ varMetadata(cel_file)
 featureData(cel_file)
 
 #assay data
-assayData <- assayData(cel_file)
+assayData_1 <- assayData(cel_file)
 #Pheno data
 
-pheno1 <- phenoData(cel_file)
-pheno1
+pheno_1 <- phenoData(cel_file)
+
 
 #crearé un dataframe para poder crear otra clase "AnnotatedDataFrame".
 
-pheno2 <- data.frame(sampleNames(assayData(cel_file)))
-colnames(pheno2) <- "sampleID"
-pheno2
+pheno2 <- data.frame(sampleNames(assayData_1))
+colnames(pheno2) <- "sample"
+
 meta <- varMetadata(cel_file)
-meta
+
 class(meta)
 dim(meta)
-sampleNames(assayData(cel_file)) == sampleNames(phenoData(cel_file))
-phenoData <- new("AnnotatedDataFrame", data=pheno2, varMetadata = meta)
+phenoData_creada <- new("AnnotatedDataFrame", data=pheno2, varMetadata = meta)
 
 #Annotation
 
-annotation <- annotation(cel_file)
+annotation_1 <- annotation(cel_file)
 
 #Experiment data
 
 experimentData(cel_file) #El fichero no contiene informacion sore el experimento, buscaremos en internet
 
-experimentData <- new("MIAME",
+experimentData_1 <- new("MIAME",
                       name="Takaaki Kobayashi",
                       lab = "Kyorin university",
                       contact = "	ck9t-kbys@asahi-net.or.jp",
@@ -70,10 +69,19 @@ experimentData <- new("MIAME",
 
 #Por ultimo ensamblamos todos los objetos creados anteriormente en la clase ExpressionSet.
 
-ExpressionSet_colon <- ExpressionSet(assayData=assayData, phenoData = phenoData, 
-                                     annotation = annotation, experimentData = experimentData)
+ExpressionSet_colon <- ExpressionSet(assayData=assayData_1, phenoData = pheno_1, 
+                                     annotation = annotation_1, experimentData = experimentData_1)
 
+#Cuando intentamos crear el ExpressionSet con el la instancia de "AnottedDataFrame" creada
+#manualmente, nos sale un mensaje de error debido a que los nombres de las muestras difieren
 
+sampleNames(assayData_1) == sampleNames(phenoData_creada)
+sampleNames(assayData_1)[1]
 
+#Find out how you can access and change ...
+# the expression values or the covariates in the phenoData
 
-
+dim(ExpressionSet_colon)
+dim(cel_file)
+class(cel_file)
+class(ExpressionSet_colon)
