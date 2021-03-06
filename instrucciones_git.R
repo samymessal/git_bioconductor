@@ -20,3 +20,4 @@ edit_r_environ() #Bajo el nombre GITHUB_PAT = "tokken"
 use_github(protocol = "https", auth_token = Sys.getenv("GITHUB_PAT"))
 
 #Modificamos ahora para ver que pasa
+#Para guardar los cambios realizados en github, es necesario darle a "push" despues del commit
