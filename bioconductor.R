@@ -56,7 +56,7 @@ pData(phenoData)
 sampleNames(phenoData)
 varMetadata(phenoData)
 
-#Anadimos la informacion sobre el chib que estamos utilizando
+#Anadimos la informacion sobre el chip que estamos utilizando
 
 annotation <- "hgu95av2"
 #Experiment description MIAME
