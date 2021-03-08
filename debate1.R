@@ -5,83 +5,140 @@
 #Create an ExpressionSet from scratch using, for example, information from a study downladed from GEO.
 #Utilizaré el estudio que he presentado en el formulario.
 
-#Para obtener el ExpressionSet a partir de los datos proporcionados en GEO entry: 
-#GSE65480 en el formato .CEL
-#Utilizaré otros paquetes de Bioconductor: affy, lima, hgu95a.db, annotate.
-#Siguiendo este tutorial http://rstudio-pubs-static.s3.amazonaws.com/16793_fba4b435fe4e4c17bf6a13b5d8d05eec.html
+#Para obtener el ExpressionSet a partir de los datos proporcionados en GEO entry, descargaremos
+#el series_matrix.txt. El identificador del estudio es GSE65480.
 
-BiocManager::install(c("affy","lima", "hgu95a.db", "annotate"))
+datadir <- "."  #El proyecto esta creado en este directorio
+info <- readLines(file.path(datadir, "GSE65480_series_matrix.txt"), n=62)
+# A partir de comandos del terminal, utilizando grep, sabemos que el !series_matrix_begin
+#se encuentra en la linea 63.
 
-require(affy)
-require(lima)
-require(hgu95a.db)
-require(annotate)
-require(Biobase)
-cel_file <- ReadAffy(celfile.path = "./GSE65480_RAW", compress = TRUE)
+rows2read <- 33362 - 63 - 2 #33362 son el numero de lineas totales, 63 las de la info y
+                            #2 del titulo y final.
 
-cel_file
-colnames(cel_file)
-class(cel_file)
-dim(cel_file)
+matriz_GSE <- read.table(file.path(datadir, "GSE65480_series_matrix.txt"), skip=63, 
+                         header = TRUE, sep="\t", row.names=1, nrows=rows2read)
 
-str(cel_file)
+dim(matriz_GSE)
 
-annotation(cel_file)
+#Para facilitar la visualizacion de los datos, cambiaremos el nombre de las columnas
+#Las separaremos en central y frontal, que son los sitios de donde se han extraido las muestras.
+#A partir de la informacion obtenida en GEO, podemos ver que las muestras centrales corresponden
+# a identificadores pares.
+copia_matriz <- matriz_GSE
+count <- 1
+count_name <- 1
 
-pData(cel_file) #Podemos ver que no tenemos informacion sobre los pacientes
+for (i in colnames(copia_matriz)){
+  if (as.integer(substr(i, nchar(i)-1, nchar(i))) %% 2 == 0){
+    colnames(copia_matriz)[count] <- paste("Central",count_name,sep="_")
+  }
+  else {
+    colnames(copia_matriz)[count]<- paste("Frontal", count_name, sep="_")
+    count_name <- count_name + 1
+  
+  }
+  count <- count + 1
+}
+colnames(copia_matriz)
 
-varMetadata(cel_file) 
+maximos <- apply(copia_matriz, 2, max)
+minimos <- apply(copia_matriz, 2, min)
 
-featureData(cel_file)
+par(mfrow=c(2,1))
+plot(maximos, type = "l", xaxt="n", xlab="", col="blue")
+axis(1, at = seq(1, 40), las=2, labels = colnames(copia_matriz) )
 
-#assay data
-assayData_1 <- assayData(cel_file)
-#Pheno data
+plot(minimos, type= "l", col="red", xaxt="n", xlab="")
+axis(1, at = seq(1,40), las=2, labels=colnames(copia_matriz))
 
-pheno_1 <- phenoData(cel_file)
+par(mfrow=c(1,1))
+boxplot(copia_matriz, las=2)
+
+cluster <- hclust(dist(t(copia_matriz)), method = "ward.D2")
+plot(cluster, hang=-1) #Los grupos central y frontal parecen agrupados entre si
+                        #No parece haber clara diferencia en la expresion
+                        #entre las muestras centrales y frontales
 
 
-#crearé un dataframe para poder crear otra clase "AnnotatedDataFrame".
+#Hemos analizado la matriz de expresion, ahora pasamos a obtener el phenoData
+#La informacion normalmente contenida en targets se encuentra en el series matrix
+#despues de la linea !Sample_. A partir del terminal buscaremos la posicion de esta.
 
-pheno2 <- data.frame(sampleNames(assayData_1))
-colnames(pheno2) <- "sample"
+rows2read_sup <- 1
+sample_suplementary_file <- read.table(file.path(datadir, "GSE65480_series_matrix.txt"), skip = 60, 
+                                       sep="\t", row.names = 1, nrows = rows2read_sup)
 
-meta <- varMetadata(cel_file)
+dim(sample_suplementary_file) #tenemos que convertirlo a 40 filas
+sample_suplementary_file <- t(sample_suplementary_file)
+dim(sample_suplementary_file)
 
-class(meta)
-dim(meta)
-phenoData_creada <- new("AnnotatedDataFrame", data=pheno2, varMetadata = meta)
+targets <- data.frame(sampleNames = colnames(matriz_GSE), group = colnames(copia_matriz),
+                      sup_file = sample_suplementary_file, row.names = 1)
 
-#Annotation
+info_columns <- data.frame(labelDescription = c("Type of Sample", "More info link"))
 
-annotation_1 <- annotation(cel_file)
+phenoData_colon <- new("AnnotatedDataFrame", data=targets, varMetadata= info_columns)
 
-#Experiment data
 
-experimentData(cel_file) #El fichero no contiene informacion sore el experimento, buscaremos en internet
+info <- new("MIAME",name = "Takaaki Kobayashi", lab = "Kyorin university", 
+             contact = "ck9t-kbys@asahi-net.or.jp", title= "Expression data at each site in colon cancer")
 
-experimentData_1 <- new("MIAME",
-                      name="Takaaki Kobayashi",
-                      lab = "Kyorin university",
-                      contact = "	ck9t-kbys@asahi-net.or.jp",
-                      title = "	Expression data at each site in colon cancer",
-                      )
+#Para utilizar la funcion ExpressionSet necesitamos convertir la matriz_GSE (es un dataframe),
+# en matriz
 
-#Por ultimo ensamblamos todos los objetos creados anteriormente en la clase ExpressionSet.
+matriz_GSE <- data.matrix(matriz_GSE)
+myEset <- ExpressionSet(assayData = matriz_GSE, phenoData = phenoData_colon,
+                        experimentData = info, )
 
-ExpressionSet_colon <- ExpressionSet(assayData=assayData_1, phenoData = pheno_1, 
-                                     annotation = annotation_1, experimentData = experimentData_1)
+class(myEset)
 
-#Cuando intentamos crear el ExpressionSet con el la instancia de "AnottedDataFrame" creada
-#manualmente, nos sale un mensaje de error debido a que los nombres de las muestras difieren
+dim(exprs(myEset))
+head(pData(myEset))
 
-sampleNames(assayData_1) == sampleNames(phenoData_creada)
-sampleNames(assayData_1)[1]
+#Rompemos el expresionset en grupo central y frontal.
+#Para ello creamos una funcion para obtener los indices de cada muestra.
 
-#Find out how you can access and change ...
-# the expression values or the covariates in the phenoData
+get_index <- function(x, pair=0){
+  count <- 1
+  pair_index <- c()
+  odd_index <- c()
+  for (i in x){
+    if(as.integer(substr(i, nchar(i)-1, nchar(i))) %% 2 == 0){
+      pair_index <- c(pair_index, count)
+    }
+    else{
+      odd_index <- c(odd_index, count)
+    }
+    count<- count + 1
+  }
+  if (pair==0){
+    return(pair_index)
+  }
+  else{
+    return(odd_index)
+  }
+}
+samples <- sampleNames(myEset)
 
-dim(ExpressionSet_colon)
-dim(cel_file)
-class(cel_file)
-class(ExpressionSet_colon)
+subset_central <- myEset[, get_index(samples)]
+
+subset_frontal <- myEset[, get_index(samples,1)]
+
+head(exprs(subset_central))
+head(exprs(subset_frontal))
+
+#Ejericicio 2 diapositiva 2
+#GEO query
+
+BiocManager::install("GEOquery")
+require(GEOquery)
+
+gse <- getGEO("GSE65480")
+class(gse)
+gse[[1]]
+
+ExpressionSet_colonGEO <- gse[[1]]
+dim(ExpressionSet_colonGEO)
+
+
