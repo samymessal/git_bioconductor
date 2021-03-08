@@ -128,6 +128,16 @@ subset_frontal <- myEset[, get_index(samples,1)]
 head(exprs(subset_central))
 head(exprs(subset_frontal))
 
+head(pData(subset_central)) #podemos ver que el phenoData también ha sido dividido
+
+#Podemos cambiar los datos de expresion del subset_central
+
+exprs(subset_central)[1,1] <- 0.0098
+head(exprs(subset_central)) #El primer valor de expresion ha sido cambiado a 0.0098
+
+pData(subset_central)$group[1] <- "lo que me apetezca"
+head(pData(subset_central))     #Podemos cambiar los grupos en el pData tambien
+
 #Ejericicio 2 diapositiva 2
 #GEO query
 
