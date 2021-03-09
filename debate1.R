@@ -138,12 +138,29 @@ head(exprs(subset_central)) #El primer valor de expresion ha sido cambiado a 0.0
 pData(subset_central)$group[1] <- "lo que me apetezca"
 head(pData(subset_central))     #Podemos cambiar los grupos en el pData tambien
 
-#Ejericicio 2 diapositiva 2
+dif <- exprs(subset_central)/exprs(subset_frontal)
+p_dif <- data.frame(sampleNames = paste(sampleNames(subset_central), " - ", 
+                                            sampleNames(subset_frontal)), row.names = 1,
+                    group = paste(pData(subset_central)$group," - ", pData(subset_frontal)$group))
+
+var_dif <- data.frame(labelDescription = c("Samples used"), row.names = 1)
+
+pheno_dif <- new("AnnotatedDataFrame", data = p_dif, varMetadata = var_dif )
+dif_eset <- ExpressionSet(assayData = dif)
+phenoData(dif_eset) <- pheno_dif
+head(pData(dif_eset))
+min(exprs(dif_eset))
+dif_sorted <- sort(dif)
+
+
+
+#Ejericicio 2 diapositivas
 #GEO query
 
 BiocManager::install("GEOquery")
 require(GEOquery)
 
+browseVignettes("GEOquery")
 gse <- getGEO("GSE65480")
 class(gse)
 gse[[1]]
