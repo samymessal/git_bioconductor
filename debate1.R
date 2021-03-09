@@ -96,6 +96,7 @@ class(myEset)
 dim(exprs(myEset))
 head(pData(myEset))
 
+#La funcion que crearemos a continuacion es unicamente necesaria, debido al estudio que he escogido.
 #Rompemos el expresionset en grupo central y frontal.
 #Para ello creamos una funcion para obtener los indices de cada muestra.
 
@@ -123,12 +124,19 @@ samples <- sampleNames(myEset)
 
 subset_central <- myEset[, get_index(samples)]
 
-subset_frontal <- myEset[, get_index(samples,1)]
+subset_frontal <- myEset[, get_index(samples,1)] #al anadir el 1 en la funcion get_index()
+                                                  #obtenemos el vector con los indices impares(frontal)
 
 head(exprs(subset_central))
 head(exprs(subset_frontal))
 
 head(pData(subset_central)) #podemos ver que el phenoData también ha sido dividido
+
+wilcox.test(exprs(subset_central), exprs(subset_frontal), paired = TRUE, 
+            conf.int = TRUE, conf.level = .95)
+
+#El p valor es muy inferior a 0.05, por lo tanto rechazamos la hipotesis nula,
+#parecen existir diferencias significativas entre la expresion de las muestras centrales y frontales.
 
 #Podemos cambiar los datos de expresion del subset_central
 
@@ -138,19 +146,8 @@ head(exprs(subset_central)) #El primer valor de expresion ha sido cambiado a 0.0
 pData(subset_central)$group[1] <- "lo que me apetezca"
 head(pData(subset_central))     #Podemos cambiar los grupos en el pData tambien
 
-dif <- exprs(subset_central)/exprs(subset_frontal)
-p_dif <- data.frame(sampleNames = paste(sampleNames(subset_central), " - ", 
-                                            sampleNames(subset_frontal)), row.names = 1,
-                    group = paste(pData(subset_central)$group," - ", pData(subset_frontal)$group))
 
-var_dif <- data.frame(labelDescription = c("Samples used"), row.names = 1)
 
-pheno_dif <- new("AnnotatedDataFrame", data = p_dif, varMetadata = var_dif )
-dif_eset <- ExpressionSet(assayData = dif)
-phenoData(dif_eset) <- pheno_dif
-head(pData(dif_eset))
-min(exprs(dif_eset))
-dif_sorted <- sort(dif)
 
 
 
@@ -161,11 +158,21 @@ BiocManager::install("GEOquery")
 require(GEOquery)
 
 browseVignettes("GEOquery")
-gse <- getGEO("GSE65480")
-class(gse)
-gse[[1]]
+gse <- getGEO("GSE65480", GSEMatrix = TRUE)
 
 ExpressionSet_colonGEO <- gse[[1]]
-dim(ExpressionSet_colonGEO)
+head(pData(ExpressionSet_colonGEO))
+head(varMetadata(ExpressionSet_colonGEO))
+
+#Igual que antes podemos manejar el expressionSet
+
+samples_GEO <- sampleNames(ExpressionSet_colonGEO)
+samples_GEO
+subset_centralGEO <- ExpressionSet_colonGEO[, get_index(samples_GEO)]
+subset_frontalGEO <- ExpressionSet_colonGEO[,get_index(samples_GEO, 1)]
+
+dim(subset_centralGEO)
+
+
 
 

@@ -1,0 +1,253 @@
+---
+title: "Debate 1: Microarrays, R y Estadistica"
+author: "Samy Messal"
+date: "3/9/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+
+---
+
+
+# Ejericio 1. Descripcion del estudio
+
+### Titulo del estudio:
+
+Microarray Analysis of Gene Expression at the Tumor Front of Colon Cancer
+
+### Tipo de microarrays que utilizan:
+
+Se tratan de microarrays de un color, fabricados por la empresa Affymetrix. Human Gene ST 1.0.
+
+### Número de muestras y grupos que contiene el estudio:
+
+A partir de 20 pacientes, obtenemos 40 muestras divididas en dos grupos, el grupo central y el frontal.
+
+### Que pregunta principal persigue responder:
+
+El tumor budding es un factor de mal pronóstico en el cáncer colorrectal, el objetivo del estudio es identificar los posibles genes asociados con la presencia de estas células malignas que se suelen encontrar en la parte frontal (invasiva). 
+
+### Enlace a los datos y/o al artículo:
+
+https://pubmed.ncbi.nlm.nih.gov/26637872/
+
+https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE65480
+
+### Comentarios adicionales:
+
+El tumor budding se conoce como la presencia de un grupo de células de células aisladas o agrupadas en pequeños grupos de hasta 5 células desprendidas del tumor restante.
+Comparando la expresión de diversos genes entre la parte frontal y la parte central del tumor, se han podido identificar varios genes sobreexpresados que podrían ser dianas terapéuticas para controlar la progresión y la malignidad del tumor.
+
+
+# Ejercicio 2. Analisis del estudio.
+
+El proyecto esta disponible en github pulsando [aqui](https://github.com/samymessal/git_bioconductor.git)
+
+## Ejercicio 1 diapositivas
+
+### Create an ExpressionSet from scratch using, for example, information from a study downladed from GEO.
+
+
+Utilizaré el estudio que he presentado en la primera parte de este documento.
+Para obtener el ExpressionSet a partir de los datos proporcionados en GEO entry, descargaremos el series_matrix.txt. El identificador del estudio es GSE65480.
+
+```{r, message=FALSE}
+require(Biobase)
+datadir <- "."  #El proyecto esta creado en este directorio
+info <- readLines(file.path(datadir, "GSE65480_series_matrix.txt"), n=62)
+# A partir de comandos del terminal, utilizando grep, sabemos que el !series_matrix_begin
+#se encuentra en la linea 63.
+
+rows2read <- 33362 - 63 - 2 #33362 son el numero de lineas totales, 63 las de la info y
+                            #2 del titulo y final.
+
+matriz_GSE <- read.table(file.path(datadir, "GSE65480_series_matrix.txt"), skip=63, 
+                         header = TRUE, sep="\t", row.names=1, nrows=rows2read)
+
+dim(matriz_GSE)
+```
+Para facilitar la visualizacion de los datos, cambiaremos el nombre de las columnas. Las separaremos en central y frontal, que son los sitios de donde se han extraido las muestras. A partir de la informacion obtenida en GEO, podemos ver que las muestras centrales corresponden a identificadores pares.
+
+```{r}
+copia_matriz <- matriz_GSE
+count <- 1
+count_name <- 1
+
+for (i in colnames(copia_matriz)){
+  if (as.integer(substr(i, nchar(i)-1, nchar(i))) %% 2 == 0){
+    colnames(copia_matriz)[count] <- paste("Central",count_name,sep="_")
+  }
+  else {
+    colnames(copia_matriz)[count]<- paste("Frontal", count_name, sep="_")
+    count_name <- count_name + 1
+  
+  }
+  count <- count + 1
+}
+colnames(copia_matriz)
+
+maximos <- apply(copia_matriz, 2, max)
+minimos <- apply(copia_matriz, 2, min)
+
+par(mfrow=c(2,1))
+plot(maximos, type = "l", xaxt="n", xlab="", col="blue")
+axis(1, at = seq(1, 40), las=2, labels = colnames(copia_matriz) )
+
+plot(minimos, type= "l", col="red", xaxt="n", xlab="")
+axis(1, at = seq(1,40), las=2, labels=colnames(copia_matriz))
+
+par(mfrow=c(1,1))
+boxplot(copia_matriz, las=2)
+
+cluster <- hclust(dist(t(copia_matriz)), method = "ward.D2")
+plot(cluster, hang=-1)
+```
+
+Los grupos central y frontal parecen agrupados entre si, no parece haber clara diferencia en la expresion entre las muestras centrales y frontales.
+
+Hemos analizado la matriz de expresion, ahora pasamos a obtener el phenoData
+La informacion normalmente contenida en targets se encuentra en el series matrix despues de la linea !Sample_. A partir del terminal buscaremos la posicion de esta, con el comando grep -n.
+Para simplicar el proceso, escogeré una sola informacion.
+
+```{r}
+rows2read_sup <- 1
+sample_suplementary_file <- read.table(file.path(datadir, "GSE65480_series_matrix.txt"), skip = 60, 
+                                       sep="\t", row.names = 1, nrows = rows2read_sup)
+
+dim(sample_suplementary_file) #tenemos que convertirlo a 40 filas
+sample_suplementary_file <- t(sample_suplementary_file)
+dim(sample_suplementary_file)
+
+targets <- data.frame(sampleNames = colnames(matriz_GSE), group = colnames(copia_matriz),
+                      sup_file = sample_suplementary_file, row.names = 1)
+
+info_columns <- data.frame(labelDescription = c("Type of Sample", "More info link"))
+
+phenoData_colon <- new("AnnotatedDataFrame", data=targets, varMetadata= info_columns)
+
+
+info <- new("MIAME",name = "Takaaki Kobayashi", lab = "Kyorin university", 
+             contact = "ck9t-kbys@asahi-net.or.jp", title= "Expression data at each site in colon cancer")
+```
+
+#### Creacion y manipulacion del ExpressionSet 
+Para utilizar la funcion ExpressionSet necesitamos convertir la matriz_GSE (es un dataframe), en matriz
+
+```{r}
+matriz_GSE <- data.matrix(matriz_GSE)
+myEset <- ExpressionSet(assayData = matriz_GSE, phenoData = phenoData_colon,
+                        experimentData = info, )
+
+class(myEset)
+
+dim(exprs(myEset))
+head(pData(myEset))
+```
+
+La funcion que crearemos a continuacion es unicamente necesaria, debido al estudio que he escogido.
+Rompemos el expresionset en grupo central y frontal.
+Para ello creamos una funcion para obtener los indices de cada muestra.
+
+```{r}
+get_index <- function(x, pair=0){
+  count <- 1
+  pair_index <- c()
+  odd_index <- c()
+  for (i in x){
+    if(as.integer(substr(i, nchar(i)-1, nchar(i))) %% 2 == 0){
+      pair_index <- c(pair_index, count)
+    }
+    else{
+      odd_index <- c(odd_index, count)
+    }
+    count<- count + 1
+  }
+  if (pair==0){
+    return(pair_index)
+  }
+  else{
+    return(odd_index)
+  }
+}
+samples <- sampleNames(myEset)
+
+subset_central <- myEset[, get_index(samples)]
+
+#Al anadir el 1 en la funcion get_index() obtenemos el vector con los indices impares(frontal)
+subset_frontal <- myEset[, get_index(samples,1)] 
+
+head(exprs(subset_central))
+head(exprs(subset_frontal))
+```
+Podemos ver que el phenoData también ha sido dividido
+
+```{r}
+head(pData(subset_central)) 
+
+wilcox.test(exprs(subset_central), exprs(subset_frontal), paired = TRUE, 
+           conf.int = TRUE, conf.level = .95)
+
+#El p valor es muy inferior a 0.05, por lo tanto rechazamos la hipotesis nula,
+#parecen existir diferencias significativas entre la expresion de las muestras centrales y frontales.
+
+#Podemos cambiar los datos de expresion del subset_central
+
+exprs(subset_central)[1,1] <- 0.0098
+head(exprs(subset_central)) #El primer valor de expresion ha sido cambiado a 0.0098
+
+pData(subset_central)$group[1] <- "lo que me apetezca"
+head(pData(subset_central))     #Podemos cambiar los grupos en el pData tambien
+```
+
+## Ejercicio 2 diapositivas
+### Create an ExpressionSet by downloading it from GEO.
+
+```{r, message=FALSE}
+require(GEOquery)
+
+browseVignettes("GEOquery")
+gse <- getGEO("GSE65480", GSEMatrix = TRUE)
+
+ExpressionSet_colonGEO <- gse[[1]]
+```
+
+Podemos ver que a diferencia del apartado anterior, donde escogi una sola linea a partir del series_matrix, buscando el !Sample_.
+Tenemos mucha mas informacion directamente.
+
+```{r}
+head(pData(ExpressionSet_colonGEO))[1]
+head(varMetadata(ExpressionSet_colonGEO))
+```
+
+#### Manejo del ExpressionSet
+
+```{r}
+
+samples_GEO <- sampleNames(ExpressionSet_colonGEO)
+samples_GEO
+subset_centralGEO <- ExpressionSet_colonGEO[, get_index(samples_GEO)]
+subset_frontalGEO <- ExpressionSet_colonGEO[,get_index(samples_GEO, 1)]
+
+dim(subset_centralGEO)
+```
+
+# Ejercicio 3. Diseño de experimentos.
+
+### Diseño experimental utilizado:
+
+Se trata de un estudio observacional similar a un caso-control, en nuestro estudio, el control corresponde al grupo central mientras que los casos son las muestras extraidas de la parte frontal del tumor. Es un estudio de class-comparison donde se busca una diferencia de expresion génica entre estos dos grupos, para identificar los genes responsables del mal pronostico en pacientes que sufren de cancer colonorrectal.
+
+### Tamaño muestra
+
+Existen diversas alternativas para estimar el tamaño muestral, dados mis conocimientos en estadística, utilizaria uno de los programas disponibles en la web o en R.
+El tamaño muestral dependera de la potencia y la confianza que deseamos obtener en nuestro estudio, cuanto mas elevados sean estos parametros, mas grande sera la muestra necesaria. 
+
+
+
+
+
+
+
+
+

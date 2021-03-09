@@ -2,6 +2,8 @@ if (!require("BiocManager"))
   +     install.packages("BiocManager")
 BiocManager::install("Biobase")
 
+# Ver debate 1 para mas aclaraciones.
+
 #Creacion del expressionSet a partir de los ficheros del ordenador
 
 #AssayData
